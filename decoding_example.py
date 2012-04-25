@@ -1,6 +1,6 @@
 ### Load Haxby dataset ########################################################
 from nisl import datasets
-dataset = datasets.fetch_haxby_data()
+dataset = datasets.load_haxby()
 X = dataset.data
 mask = dataset.mask
 y = dataset.target
@@ -11,7 +11,7 @@ import numpy as np
 from scipy import signal
 
 # Build the mean image because we have no anatomic data
-mean_img = X.mean(-1)
+mean_img = X.mean(axis=-1)
 
 X.shape
 # (40, 64, 64, 1452)

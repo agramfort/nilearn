@@ -403,8 +403,8 @@ def fetch_star_plus_data(data_dir=None, force_download=False):
     return all_subject
 
 
-def fetch_haxby_data(data_dir=None, force_download=False):
-    """Returns the haxby datas
+def load_haxby(data_dir=None, force_download=False):
+    """Returns the haxby data
 
     Returns
     -------

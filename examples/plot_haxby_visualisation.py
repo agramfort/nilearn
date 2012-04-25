@@ -18,13 +18,13 @@ from nisl import datasets
 from matplotlib import pyplot as plt
 
 ### Load dataset
-data = datasets.fetch_haxby_data(data_dir='../nisl_data')
+data = datasets.load_haxby(data_dir='../nisl_data')
 y = data.target
 session = data.session
 X = data.data
 mask = data.mask
 img_shape = X[..., 0].shape
-mean_img = X.mean(-1)
+mean_img = X.mean(axis=-1)
 
 # Process the data in order to have a two-dimensional design matrix X of
 # shape (nb_samples, nb_features).
