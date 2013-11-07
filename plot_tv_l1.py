@@ -534,20 +534,25 @@ def tvl1_path(X, y, shape=None, l1_ratio=0.5, eps=1e-3, alphas=None,
     n_samples, n_features = X.shape
 
     alphas = np.sort(alphas)[::-1]  # make sure alphas are properly ordered
-    models = []
 
-    mode = params.pop('mode')
+    params.pop('mode')
+    params.pop('precompute')
+    params.pop('X_std')
+    params.pop('X_mean')
+    params.pop('Xy')
 
     n_alphas = len(alphas)
+    # models = []
+    coefs = []
     for i, alpha in enumerate(alphas):
         model = TVL1Regression(shape=shape, alpha=alpha, l1_ratio=l1_ratio,
-                      fit_intercept=False, warm_start=True)
+                               fit_intercept=False, warm_start=True)
 
         model.set_params(**params)
         model.fit(X, y)
-        if fit_intercept:
-            model.fit_intercept = True
-            model._set_intercept(X_mean, y_mean, X_std)
+
+        coefs.append(model.coef_)
+
         if verbose:
             if verbose > 2:
                 print model
@@ -555,8 +560,12 @@ def tvl1_path(X, y, shape=None, l1_ratio=0.5, eps=1e-3, alphas=None,
                 print 'Path: %03i out of %03i' % (i, n_alphas)
             else:
                 sys.stderr.write('.')
-        models.append(model)
-    return models
+
+        # if fit_intercept:
+        #     model.fit_intercept = True
+        #     model._set_intercept(X_mean, y_mean, X_std)
+        # models.append(model)
+    return alphas, np.array(coefs).T, None
 
 
 class TVL1RegressionCV(LinearModel, RegressorMixin):
@@ -564,7 +573,7 @@ class TVL1RegressionCV(LinearModel, RegressorMixin):
             fit_intercept=True, normalize=False, max_iter=1000, tol=1e-4,
             cv=None, copy_X=True, n_jobs=1, verbose=False, debias=False,
             memory=Memory(None), anisotropic=False, mask=None,
-            mu=0, scale_coef=False, mode='primal_dual', refit=True):
+            mu=0, scale_coef=False, mode='primal_dual'):
         self.shape = shape
         self.alphas = alphas
         self.l1_ratio = l1_ratio
@@ -584,7 +593,6 @@ class TVL1RegressionCV(LinearModel, RegressorMixin):
         self.scale_coef = scale_coef
         assert mode in ['primal_dual', 'fista']
         self.mode = mode
-        self.refit = refit
 
     def fit(self, X, y):
         X = atleast2d_or_csc(X, dtype=np.float64,
@@ -607,9 +615,9 @@ class TVL1RegressionCV(LinearModel, RegressorMixin):
         path_params.pop('n_jobs', None)
         path_params.pop('memory', None)
         path_params.pop('debias', None)
-        path_params.pop('refit', None)
         # Useful for TVL1RegressionCVFast
         path_params.pop('cv_alpha', None)
+        path_params['precompute'] = False
 
         if self.mode == 'fista':
             path_params.pop('mu', None)
@@ -651,13 +659,22 @@ class TVL1RegressionCV(LinearModel, RegressorMixin):
         path_params.update({'l1_ratio': best_l1_ratio})
         self.l1_ratio_ = best_l1_ratio
         self.alpha_ = best_alpha
-        if self.refit:
-            model = path_func(X, y, **path_params)[0]
 
-            self.coef_ = model.coef_
-            if hasattr(model, 'coef_full_'):
-                self.coef_full_ = model.coef_full_
-            self.intercept_ = model.intercept_
+        # refit
+        model = TVL1Regression()
+        this_params = self.get_params()
+        params = dict()
+        for p in this_params:
+            if p in model.get_params():
+                params[p] = this_params[p]
+        params['alpha'] = best_alpha
+        params['l1_ratio'] = best_l1_ratio
+        model.set_params(**params)
+        model.fit(X, y)
+        self.coef_full_ = model.coef_full_
+        self.coef_ = model.coef_
+        self.intercept_ = model.intercept_
+
         self.alphas_ = np.asarray(alphas)
         self.mse_path_ = all_mse_paths
 
@@ -771,16 +788,16 @@ if __name__ == '__main__':
 
     mask = None
 
-    # l1_ratios = [0.9]
-    # alphas = [1.]
+    l1_ratios = [0.05]
+    alphas = [.05]
 
     # mem = Memory('/tmp')
     mem = Memory(None)
 
-    if 0:
+    if 1:
         clf = TVL1RegressionCV(shape=[size, size, size], alphas=alphas,
-                    l1_ratio=l1_ratios, cv=3, n_jobs=-1,
-                    max_iter=5000, verbose=True, memory=mem,
+                    l1_ratio=l1_ratios, cv=3, n_jobs=1,
+                    max_iter=1000, verbose=True, memory=mem,
                     debias=debias, anisotropic=False,
                     mask=mask, mu=0, scale_coef=True,
                     mode='primal_dual')
